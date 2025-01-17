@@ -276,16 +276,21 @@ impl Behaviour {
         {
             // Apply address translation to the candidate address.
             // For TCP without port-reuse, the observed address contains an ephemeral port which needs to be replaced by the port of a listen address.
+            tracing::info!(">>> translating ephemeral address {observed:?}");
             let translated_addresses = {
                 let mut addrs: Vec<_> = self
                     .listen_addresses
                     .iter()
                     .filter_map(|server| {
+                        tracing::info!("> translating to listen address {server:?}");
                         if (is_tcp_addr(server) && is_tcp_addr(observed))
                             || (is_quic_addr(server, true) && is_quic_addr(observed, true))
                             || (is_quic_addr(server, false) && is_quic_addr(observed, false))
                         {
-                            _address_translation(server, observed)
+                            let translated = _address_translation(server, observed);
+                            tracing::info!("> translated to {translated:?}");
+
+                            translated
                         } else {
                             None
                         }
@@ -297,6 +302,8 @@ impl Behaviour {
                 addrs.dedup();
                 addrs
             };
+
+            tracing::info!("> translated addresses {translated_addresses:?}");
 
             // If address translation yielded nothing, broadcast the original candidate address.
             if translated_addresses.is_empty() {
@@ -313,6 +320,7 @@ impl Behaviour {
 
         // outgoing connection dialed with port reuse
         // incomming connection
+        tracing::info!(">>> skipping translation for port-reuse address {observed:?}");
         self.events
             .push_back(ToSwarm::NewExternalAddrCandidate(observed.clone()));
     }
